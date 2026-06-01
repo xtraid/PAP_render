@@ -1,81 +1,25 @@
+# OVERVIEW:
 - [ ] palette 16 colors
 - [ ] tiles 32*32
-- [ ] sprite 64*64 
+- [ ] sprite 64*64
   ~ \forall pixel \implies 4bit \in palette
 
 - [ ] save the config => palette.json + scene.json
 - [ ] final rendered device => png
 
 
-# ARCHITECTURE:
-- [ ] the palette:
-    \foreach color
-      |- is defined as RGB between 0-255 ~ 3 byte
-    \foreach pixel
-      |- has just 1 reference to a color ~ 4 bit
-- [ ] a tile sheet:
-    \is 256*256
-      |-\has 64 tiles \in grid 8*8
-    \foreach tile
-      |- \has 32*32 pixel
-    \is ordered 
-      |- tile 0 \is top left 
-                      ~    |----------------------------|
-                           | tile 0 tile 1 ... tile 7   |
-                           | tile 8        ... tile 15  |
-                           |   .                 .      |
-                           |   .                 .      |
-                           |   .                 .      |
-                           |                            |
-                           | tile 56       ... tile 63  |
-                           |----------------------------|
-- [ ] a sprite sheet:
-    \is 256*256 pixel
-      |-\has 16 sprites \in grid 4*4
-    \foreach sprite 
-      |-\has 64*64 pixel 
-    \is ordered 
-      |- sprite 0 top left 
-                      ~    |----------------------------------|
-                           | sprite 0 sprite 1  ... sprite 3  |
-                           | sprite 4           ... sprite 7  |
-                           |   .                       .      |
-                           |   .                       .      |
-                           |   .                       .      |
-                           |                                  |
-                           | sprite 12          ... sprite 15 |
-                           |----------------------------------|
-- [ ] a frame buffer:
-    \is 640*480 pixel 
-    \is fondale => whole screen
-        |-\binds tiles \by tile map 15*20 (
-                                        - 480/32 = 15
-                                        - 640/32 = 20
-                                      )
+# INTERFACE AT COMMAND LINE:
 
-- [ ] transparency:
-    \exists transparent_index \in palette (0-15)
-    \foreach sprite, \foreach pixel
-                    - \if pixel palette index == transparent_index => pixel is not copied over the tile on the buffer
-                    - \if pixel palette index != transparent_index => pixel get overwritten on the buffer
+- this program must be executable by command line with the following shape:
+  python main.py <palette.json> <scene.json> <tiles.bin> <sprites.bin> <output.png>
 
- - [ ] sprite transformation:
-     \happens before \binding frame buffer
-        |-1. reflected on x axis
-        |-2. reflected on y axis
-        |-3. rotated by 90,180,270 degree
-
-# BUILDING FLOW:
-  1. First whole fondale is drawn based on tile map
-  2. Second \foreach sprite is drawn in the order it is saved in json
-
-  N.B. a sprite can be partially out of frame \in this case the pixel drawn are just the \in frame ones
 
 # INPUT FORMAT:
  - [ ] the renderer must be able to read JSON to get assets, split in 2 separate files:
          |- palette.json  => palette only
          |- scene.json    => transparent_index, tile_map, sprites
-         |- palette \represented as pure JSON
+
+ - [ ] palette \represented as pure JSON
                       ~ [
                           [0,0,0],
                           [255,0,0],
@@ -94,6 +38,7 @@
                           [128,128,128],
                           [255,128,0]
                       ]
+
  - [ ] read tile and sprite binaries
      \saved as packed binary as 256*256 matrix
          |- packed binary are ( 256 * 256 ) / 2 bytes (file 32768 byte) (each byte contains 2 pixel)
@@ -102,10 +47,10 @@
                |- low  nibble (bit 3-0) ~ second pixel => palette index 0-15
 
  - [ ] the scene is saved in a JSON
-     \is organized such as 
+     \is organized such as
        |- 1. transparent_index ( palette index 0-15 treated as transparent )
-       |- 2. tile map ( matrix 15 * 20 )
-       |- 3. sprite ( list of sprite )
+       |- 2. tile_map ( matrix 15 * 20 of tile IDs 0-63 )
+       |- 3. sprites ( list of sprite )
          \where \foreach sprite \has (at least) columns:
              |- id
              |- x
@@ -117,21 +62,21 @@
    ~ {
        "transparent_index": 0,
        "tile_map": [
-         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
-         [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
-         [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+         [ 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  5,  5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  5,  5,  0,  0,  0,  1],
+         [ 1,  0,  0,  2,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  2,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  2,  2,  2,  2,  2,  2,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  5,  5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  5,  5,  0,  0,  0,  1],
+         [ 1,  0,  0,  2,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  2,  2,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1],
+         [ 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1]
        ],
        "sprites": [
          { "id": 0,  "x": 100, "y": 80,  "flip_x": false, "flip_y": false, "rotation": 0   },
@@ -141,26 +86,87 @@
        ]
      }
 
-# INTERFACE AT COMMAND LINE
 
-- this program must be executable by command line with the following shape: python main.py <palette.json> <scene.json> <tiles.bin> <sprites.bin> <output.png>
+# ARCHITECTURE:
+- [ ] the palette:
+    \foreach color
+      |- is defined as RGB between 0-255 ~ 3 byte
+    \foreach pixel
+      |- has just 1 reference to a color ~ 4 bit
 
-# CLASSES
+- [ ] a tile sheet:
+    \is 256*256
+      |-\has 64 tiles \in grid 8*8
+    \foreach tile
+      |- \has 32*32 pixel
+    \is ordered
+      |- tile 0 \is top left
+                      ~    |----------------------------|
+                           | tile 0 tile 1 ... tile 7   |
+                           | tile 8        ... tile 15  |
+                           |   .                 .      |
+                           |   .                 .      |
+                           |   .                 .      |
+                           |                            |
+                           | tile 56       ... tile 63  |
+                           |----------------------------|
 
-      |- [ ] 1. class Palette that takes a JSON path, reads and validate the palette and makes a index in the respective RGB value
+- [ ] a sprite sheet:
+    \is 256*256 pixel
+      |-\has 16 sprites \in grid 4*4
+    \foreach sprite
+      |-\has 64*64 pixel
+    \is ordered
+      |- sprite 0 top left
+                      ~    |----------------------------------|
+                           | sprite 0 sprite 1  ... sprite 3  |
+                           | sprite 4           ... sprite 7  |
+                           |   .                       .      |
+                           |   .                       .      |
+                           |   .                       .      |
+                           |                                  |
+                           | sprite 12          ... sprite 15 |
+                           |----------------------------------|
+
+- [ ] a frame buffer:
+    \is 640*480 pixel
+    \is fondale => whole screen
+        |-\binds tiles \by tile_map 15*20 (
+                                        - 480/32 = 15
+                                        - 640/32 = 20
+                                      )
+
+- [ ] transparency:
+    \exists transparent_index \in palette (0-15)
+    \foreach sprite, \foreach pixel
+                    - \if pixel palette index == transparent_index => pixel is not copied over the tile on the buffer
+                    - \if pixel palette index != transparent_index => pixel get overwritten on the buffer
+
+- [ ] sprite transformation:
+    \happens before \binding frame buffer
+       |-1. reflected on x axis
+       |-2. reflected on y axis
+       |-3. rotated by 90,180,270 degree
+
+
+# BUILDING FLOW:
+  1. First whole fondale is drawn based on tile_map
+  2. Second \foreach sprite is drawn in the order it is saved in json
+
+  N.B. a sprite can be partially out of frame \in this case the pixel drawn are just the \in frame ones
+
+
+# CLASSES:
+      |- [ ] 1. class Palette that takes a JSON path, reads and validates the palette and makes an index to the respective RGB value
       |- [ ] 2. class VirtualVRAM which uploads the tile sheet and sprite sheet from the respective binaries, decodes the 4 bit sequences in a matrix of palette indexes
-      |- [ ] 3.class SceneParser which read a JSON and give back the description of the frame buffer and of teh sprites
+      |- [ ] 3. class SceneParser which reads a JSON and gives back the description of the frame buffer and of the sprites
       |- [ ] 4. class Blitter which gets tiles and sprites from the respective sheets, applies flip, rotations and transparency and draws the final result in the background
-      |- [ ] 5. class RenderingPipeline which calls and execute the complete composition of the scene and export it as png
+      |- [ ] 5. class RenderingPipeline which calls and executes the complete composition of the scene and exports it as png
 
 
-# REQUIREMENTS
-
--in case of error the render must raise an exception related, is suggested to make custom exception
--each relevant function must be commented with what it does its input and its output
--Pillow usage must stay in the export to PNG only
--utilize Numpy for arrays specifically the type np.uint8
--render must be executed by command line in the proposed verison 
-
-
-
+# REQUIREMENTS:
+- in case of error the renderer must raise a related exception, is suggested to make custom exceptions
+- each relevant function must be commented with what it does, its input and its output
+- Pillow usage must stay in the export to PNG only
+- utilize Numpy for arrays, specifically the type np.uint8
+- renderer must be executed by command line in the proposed version
