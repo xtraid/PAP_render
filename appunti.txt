@@ -1,5 +1,5 @@
 # OVERVIEW:
-- [ ] palette 16 colors
+- [x] palette 16 colors
 - [ ] tiles 32*32
 - [ ] sprite 64*64
   ~ \forall pixel \implies 4bit \in palette
@@ -15,11 +15,11 @@
 
 
 # INPUT FORMAT:
- - [ ] the renderer must be able to read JSON to get assets, split in 2 separate files:
+ - [x] the renderer must be able to read JSON to get assets, split in 2 separate files:
          |- palette.json  => palette only
          |- scene.json    => transparent_index, tile_map, sprites
 
- - [ ] palette \represented as pure JSON
+ - [x] palette \represented as pure JSON
                       ~ [
                           [0,0,0],
                           [255,0,0],
@@ -88,7 +88,7 @@
 
 
 # ARCHITECTURE:
-- [ ] the palette:
+- [x] the palette:
     \foreach color
       |- is defined as RGB between 0-255 ~ 3 byte
     \foreach pixel
@@ -157,7 +157,7 @@
 
 
 # CLASSES:
-      |- [ ] 1. class Palette that takes a JSON path, reads and validates the palette and makes an index to the respective RGB value
+      |- [x] 1. class Palette that takes a JSON path, reads and validates the palette and makes an index to the respective RGB value
       |- [ ] 2. class VirtualVRAM which uploads the tile sheet and sprite sheet from the respective binaries, decodes the 4 bit sequences in a matrix of palette indexes
       |- [ ] 3. class SceneParser which reads a JSON and gives back the description of the frame buffer and of the sprites
       |- [ ] 4. class Blitter which gets tiles and sprites from the respective sheets, applies flip, rotations and transparency and draws the final result in the background

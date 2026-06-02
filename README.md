@@ -77,3 +77,17 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 - `Pillow` used only for PNG export
 - `numpy` arrays with `np.uint8` dtype
 - Custom exceptions for all error cases
+
+## Project Structure
+
+```
+.
+├── main.py               # Entry point; parses CLI arguments and runs RenderingPipeline
+├── palette.py            # Palette class: reads and validates palette.json
+├── tests.py              # Test suite
+├── test_data/
+│   ├── palette_ok.json          # Valid 16-color palette
+│   ├── palette_wrong_count.json # Only 3 colors (invalid)
+│   └── palette_wrong_value.json # Component > 255 (invalid)
+└── pyproject.toml
+```
