@@ -164,9 +164,50 @@
       |- [ ] 5. class RenderingPipeline which calls and executes the complete composition of the scene and exports it as png
 
 
+# OPTIONS / EXTRA:
+- [ ] nibble unpacker in C via ctypes
+    \instead of pure numpy in VirtualVRAM._decode()
+      |- write decode(uint8* input, int len, uint8* output) as C shared lib (.so)
+      |- load in VirtualVRAM via ctypes
+      |- good ctypes demo: simple interface, bit-level operation that belongs to low level
+      |- numpy alternative: data>>4 and data&0x0F with interleave (already fast, C not needed for perf)
+      |- value is in demonstrating ctypes cross-language integration, not raw speed
+
+
 # REQUIREMENTS:
 - in case of error the renderer must raise a related exception, is suggested to make custom exceptions
 - each relevant function must be commented with what it does, its input and its output
 - Pillow usage must stay in the export to PNG only
 - utilize Numpy for arrays, specifically the type np.uint8
 - renderer must be executed by command line in the proposed version
+
+
+# PRE-WRITING CHECKLIST (Python good habits):
+
+## Naming
+- [ ] classi in PascalCase  (es. VirtualVRAM, SceneParser)
+- [ ] metodi e variabili in snake_case  (es. load_json, tile_map)
+- [ ] costanti in UPPER_SNAKE_CASE  (es. TILE_SIZE = 32)
+
+## Attributi di istanza
+- [ ] self.x    => pubblico, parte dell'API esterna
+- [ ] self._x   => protetto, uso interno / sottoclassi
+- [ ] self.__x  => privato, name-mangled (_ClassName__x), nessuno lo tocca fuori dalla classe
+      \scegli __ solo se c'è ereditarietà o vuoi protezione esplicita, altrimenti _ basta
+
+## Dunder methods
+- [ ] __repr__  => sempre, stringa developer-facing (ideale: eval(repr(obj)) ricrea l'oggetto)
+- [ ] __str__   => opzionale, stringa human-readable per print()
+      \se implementi solo uno => implementa __repr__, Python lo usa come fallback
+- [ ] __getitem__ => se l'oggetto è indicizzabile con [], usa isinstance() per validare il tipo dell'indice
+
+## isinstance nei dunder
+- [ ] nei metodi che accettano argomenti esterni (operatori, __getitem__, ecc.)
+      usare isinstance(x, T) per dare errori chiari invece di TypeError oscuri
+      es:
+        if not isinstance(idx, int):
+            raise MyError(f"expected int, got {type(idx)}")
+
+## Eccezioni custom
+- [ ] definire almeno una eccezione per classe/modulo (es. PaletteError, VRAMError)
+- [ ] sollevarla sempre con un messaggio che dice COSA è andato storto e QUALE valore ha causato il problema

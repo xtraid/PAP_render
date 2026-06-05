@@ -63,31 +63,53 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 
 ## Architecture
 
-| Class | Responsibility |
-|---|---|
-| `Palette` | Reads and validates `palette.json`, maps index → RGB |
-| `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices |
-| `SceneParser` | Reads `scene.json`, returns tile map and sprite list |
-| `Blitter` | Applies transformations and transparency, composites tiles and sprites |
-| `RenderingPipeline` | Orchestrates the full render and exports PNG |
+| Class | Responsibility | Status |
+|---|---|---|
+| `Palette` | Reads and validates `palette.json`, maps index → RGB | Done |
+| `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices | Done |
+| `SceneParser` | Reads `scene.json`, returns tile map and sprite list | Planned |
+| `Blitter` | Applies transformations and transparency, composites tiles and sprites | Planned |
+| `RenderingPipeline` | Orchestrates the full render and exports PNG | Planned |
+
+Custom exceptions (`PaletteError`, `VRAMError`) are raised for all invalid input cases.
 
 ## Requirements
 
 - Python ≥ 3.14
 - `Pillow` used only for PNG export
 - `numpy` arrays with `np.uint8` dtype
-- Custom exceptions for all error cases
 
 ## Project Structure
 
 ```
 .
-├── main.py               # Entry point; parses CLI arguments and runs RenderingPipeline
-├── palette.py            # Palette class: reads and validates palette.json
-├── tests.py              # Test suite
+├── main.py               # Entry point (placeholder)
+├── classes.py            # Palette, VirtualVRAM (and future classes)
+├── tests.py              # Test suite (24 tests, all passing)
 ├── test_data/
 │   ├── palette_ok.json          # Valid 16-color palette
 │   ├── palette_wrong_count.json # Only 3 colors (invalid)
 │   └── palette_wrong_value.json # Component > 255 (invalid)
 └── pyproject.toml
 ```
+
+## Tests
+
+```bash
+uv run pytest tests.py -v
+```
+
+24 tests covering `Palette` and `VirtualVRAM`:
+
+**Palette (16 tests)**
+- Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
+- File errors: file not found, invalid JSON
+- Wrong color count: too few, too many, empty
+- Wrong color format: fewer than 3 components, more than 3 components
+- Out-of-range values: above 255, negative, exact 255
+- `__getitem__` bounds: index 16 and index −1
+
+**VirtualVRAM (8 tests)**
+- Happy path: load, shape and dtype, all-zeros decode, all-`0xFF` decode, nibble split (`0xAB` → 10, 11)
+- File errors: tiles not found, sprites not found
+- Wrong size: tiles file too short, sprites file too short
