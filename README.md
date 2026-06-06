@@ -2,6 +2,8 @@
 
 A command-line pixel art renderer that composites a scene from a tile-based background and a list of sprites, exporting the result as a PNG image.
 
+**Stato**: funzionalità complete. Il codice è funzionante e testato; eventuali interventi futuri riguarderanno refactoring, pulizia o ottimizzazioni.
+
 ## Overview
 
 - 16-color indexed palette (4 bit per pixel)
@@ -166,9 +168,11 @@ Raises `RenderingException` on pipeline errors.
 
 ```
 .
-├── main.py               # Entry point (placeholder)
+├── main.py               # CLI entry point
 ├── classes.py            # Palette, VirtualVRAM, SceneParser, Blitter, RenderingPipeline
-├── tests.py              # Test suite (112 tests, all passing)
+├── tests.py              # Test suite (133 tests, all passing)
+├── input/                # Example input files (palette, scene, tiles, sprites)
+├── output/               # Rendered PNG output goes here
 ├── test_data/
 │   ├── palette_ok.json             # Valid 16-color palette
 │   ├── palette_wrong_count.json    # Only 3 colors (invalid)

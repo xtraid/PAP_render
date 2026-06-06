@@ -1,11 +1,11 @@
 # OVERVIEW:
 - [x] palette 16 colors
-- [ ] tiles 32*32
-- [ ] sprite 64*64
+- [x] tiles 32*32
+- [x] sprite 64*64
   ~ \forall pixel \implies 4bit \in palette
 
-- [ ] save the config => palette.json + scene.json
-- [ ] final rendered device => png
+- [x] save the config => palette.json + scene.json
+- [x] final rendered device => png
 
 
 # INTERFACE AT COMMAND LINE:

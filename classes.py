@@ -156,6 +156,11 @@ class SceneParser:
             raise FileNotFoundError(f"scene file not found: {self.__path!r}") from e
         except json.JSONDecodeError as e:
             raise SceneError(f"file JSON not valid: {e}") from e
+        for sprite in raw.get("sprites", []):
+            if "flip_h" in sprite:
+                sprite["flip_x"] = sprite.pop("flip_h")
+            if "flip_v" in sprite:
+                sprite["flip_y"] = sprite.pop("flip_v")
         return raw
 
     # Validates the raw scene dict and returns typed, checked fields.
