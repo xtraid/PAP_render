@@ -4,6 +4,10 @@ A command-line pixel art renderer that composites a scene from a tile-based back
 
 **Stato**: funzionalità complete. Il codice è funzionante e testato; eventuali interventi futuri riguarderanno refactoring, pulizia o ottimizzazioni.
 
+## Output
+
+![example render](output/example.png)
+
 ## Overview
 
 - 16-color indexed palette (4 bit per pixel)
