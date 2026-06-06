@@ -175,10 +175,11 @@ class SceneParser:
             raise SceneError(
                 f"transparent_index must be in [0, 15], got {transparent_idx}"
             )
-        if len(tile_map) != 15 or len(tile_map[0]) != 20:
-            raise SceneError(
-                f"tile_map must be 15 x 20, got {len(tile_map)} x {len(tile_map[0])}"
-            )
+        if len(tile_map) != 15:
+            raise SceneError(f"tile_map must have 15 rows, got {len(tile_map)}")
+        for i, row in enumerate(tile_map):
+            if len(row) != 20:
+                raise SceneError(f"tile_map row {i} must have 20 columns, got {len(row)}")
         if any(not 0 <= v <= 63 for row in tile_map for v in row):
             raise SceneError("tile_map values must be in [0, 63]")
         if not isinstance(sprites, list):
@@ -192,7 +193,9 @@ class SceneParser:
                     f"sprite {i}: id must be int, got {type(sprite['id']).__name__}"
                 )
             if not 0 <= sprite["id"] <= 15:
-                raise SceneError(f"sprite {i}: id must be in [0, 15], got {sprite['id']}")
+                raise SceneError(
+                    f"sprite {i}: id must be in [0, 15], got {sprite['id']}"
+                )
             if not isinstance(sprite["x"], int):
                 raise SceneError(
                     f"sprite {i}: x must be int, got {type(sprite['x']).__name__}"
@@ -224,3 +227,107 @@ class SceneParser:
     # Output: str.
     def __repr__(self):
         return f"SceneParser(path={self.__path!r})"
+
+
+class BlitterException(Exception):
+    pass
+
+
+FRAME_W = 640
+FRAME_H = 480
+
+
+class Blitter:
+    def __init__(self, vram, asset_type, idx, transparent_index):
+        self.__vram = vram
+        self.__asset_type, self.__position, self.transparent_index = self._validate(asset_type, idx, transparent_index)
+        self._buffer = Blitter.get_buf()
+
+    # Validates asset_type, idx and transparent_index.
+    # Input: asset_type — "tile" or "sprite"; idx — int index into the respective sheet; transparent_index — palette index 0-15.
+    # Output: tuple (asset_type: str, idx: int, transparent_index: int).
+    def _validate(self, asset_type, idx, transparent_index):
+        if asset_type not in {"tile", "sprite"}:
+            raise BlitterException(
+                f"asset_type must be 'tile' or 'sprite', got {asset_type!r}"
+            )
+        if not isinstance(idx, int):
+            raise BlitterException(f"idx must be int, got {type(idx).__name__}")
+        if asset_type == "tile" and not 0 <= idx <= 63:
+            raise BlitterException(f"tile idx must be in [0, 63], got {idx}")
+        if asset_type == "sprite" and not 0 <= idx <= 15:
+            raise BlitterException(f"sprite idx must be in [0, 15], got {idx}")
+        if not isinstance(transparent_index, int):
+            raise BlitterException(f"transparent_index must be int, got {type(transparent_index).__name__}")
+        if not 0 <= transparent_index <= 15:
+            raise BlitterException(f"transparent_index must be in [0, 15], got {transparent_index}")
+        return asset_type, idx, transparent_index
+
+    # Blits the tile at self.__position onto the frame buffer at the given tilemap cell.
+    # Input: row — int in [0, 14]; col — int in [0, 19].
+    # Output: none (writes to self._buffer in place).
+    def blit_tile(self, row, col):
+        if not isinstance(row, int):
+            raise BlitterException(f"row type must be int, got {type(row).__name__}")
+        if not isinstance(col, int):
+            raise BlitterException(f"col type must be int, got {type(col).__name__}")
+        if not 0 <= row <= 14:
+            raise BlitterException(
+                f"inserted row not valid, must be in [0,14], got {row}"
+            )
+        if not 0 <= col <= 19:
+            raise BlitterException(
+                f"inserted col not valid, must be in [0,19], got {col}"
+            )
+        tile_buf = self.__vram.get_tile(self.__position).copy()
+        self._buffer[row * 32 : row * 32 + 32, col * 32 : col * 32 + 32] = tile_buf
+
+    # Applies flip and rotation transformations to a sprite matrix.
+    # Input: sprite_matrix — np.ndarray (64, 64) uint8; flip_x, flip_y — bool; rotation — 0/90/180/270.
+    # Output: np.ndarray (64, 64) uint8 transformed.
+    def _transform(self, sprite_matrix, flip_x, flip_y, rotation):
+        m = sprite_matrix
+        if flip_x:
+            m = np.fliplr(m)
+        if flip_y:
+            m = np.flipud(m)
+        if rotation != 0:
+            m = np.rot90(m, rotation // 90)
+        return m
+
+    # Computes valid src/dst slice pairs to copy a 64x64 sprite at (x, y) into the frame buffer.
+    # Input: x, y — top-left position of the sprite in the frame buffer (can be negative).
+    # Output: tuple (dst, src) where each is a tuple of two slice objects (rows, cols).
+    def _clip(self, x, y):
+        dst_r0 = max(0, y)
+        dst_r1 = min(FRAME_H, y + 64)
+        dst_c0 = max(0, x)
+        dst_c1 = min(FRAME_W, x + 64)
+        src_r0 = max(0, -y)
+        src_r1 = src_r0 + (dst_r1 - dst_r0)
+        src_c0 = max(0, -x)
+        src_c1 = src_c0 + (dst_c1 - dst_c0)
+        return (slice(dst_r0, dst_r1), slice(dst_c0, dst_c1)), (
+            slice(src_r0, src_r1),
+            slice(src_c0, src_c1),
+        )
+
+    # Blits the sprite at self.__position onto the frame buffer with transformations and transparency.
+    # Input: x, y — top-left position in the frame buffer (can be negative); flip_x, flip_y — bool; rotation — 0/90/180/270.
+    # Output: none (writes to self._buffer in place).
+    def blit_sprite(self, x, y, flip_x, flip_y, rotation):
+        sprite_buf = self.__vram.get_sprite(self.__position).copy()
+        sprite_buf = self._transform(sprite_buf, flip_x, flip_y, rotation)
+        mask = sprite_buf != self.transparent_index
+        dst, src = self._clip(x, y)
+        self._buffer[dst][mask[src]] = sprite_buf[src][mask[src]]
+
+    # Creates and returns a blank frame buffer.
+    # Input: none.
+    # Output: np.ndarray of shape (FRAME_H, FRAME_W) dtype uint8, all zeros.
+    @classmethod
+    def get_buf(cls):
+        return np.zeros((FRAME_H, FRAME_W), dtype=np.uint8)
+
+    def __repr__(self):
+        return f"Blitter(asset_type={self.__asset_type!r}, position={self.__position})"

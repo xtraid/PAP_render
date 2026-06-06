@@ -128,7 +128,7 @@
                            | sprite 12          ... sprite 15 |
                            |----------------------------------|
 
-- [ ] a frame buffer:
+- [x] a frame buffer:
     \is 640*480 pixel
     \is fondale => whole screen
         |-\binds tiles \by tile_map 15*20 (
@@ -136,13 +136,13 @@
                                         - 640/32 = 20
                                       )
 
-- [ ] transparency:
+- [x] transparency:
     \exists transparent_index \in palette (0-15)
     \foreach sprite, \foreach pixel
                     - \if pixel palette index == transparent_index => pixel is not copied over the tile on the buffer
                     - \if pixel palette index != transparent_index => pixel get overwritten on the buffer
 
-- [ ] sprite transformation:
+- [x] sprite transformation:
     \happens before \binding frame buffer
        |-1. reflected on x axis
        |-2. reflected on y axis
@@ -160,7 +160,7 @@
       |- [x] 1. class Palette that takes a JSON path, reads and validates the palette and makes an index to the respective RGB value
       |- [x] 2. class VirtualVRAM which uploads the tile sheet and sprite sheet from the respective binaries, decodes the 4 bit sequences in a matrix of palette indexes
       |- [x] 3. class SceneParser which reads a JSON and gives back the description of the frame buffer and of the sprites
-      |- [ ] 4. class Blitter which gets tiles and sprites from the respective sheets, applies flip, rotations and transparency and draws the final result in the background
+      |- [x] 4. class Blitter which gets tiles and sprites from the respective sheets, applies flip, rotations and transparency and draws the final result in the background
       |- [ ] 5. class RenderingPipeline which calls and executes the complete composition of the scene and exports it as png
 
 

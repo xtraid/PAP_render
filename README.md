@@ -68,10 +68,10 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 | `Palette` | Reads and validates `palette.json`, maps index → RGB | Done |
 | `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices; exposes `get_tile(id)` and `get_sprite(id)` | Done |
 | `SceneParser` | Reads and validates `scene.json`, returns `transparent_index`, `tile_map`, and `sprites` | Done |
-| `Blitter` | Applies transformations and transparency, composites tiles and sprites | Planned |
+| `Blitter` | Composites tiles and sprites onto a 640×480 frame buffer; applies flip/rotation and transparency | Done |
 | `RenderingPipeline` | Orchestrates the full render and exports PNG | Planned |
 
-Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all three classes.
+Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`, `BlitterException`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all file-loading classes.
 
 ## Requirements
 
@@ -84,12 +84,15 @@ Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all
 ```
 .
 ├── main.py               # Entry point (placeholder)
-├── classes.py            # Palette, VirtualVRAM, SceneParser (and future classes)
-├── tests.py              # Test suite (65 tests, all passing)
+├── classes.py            # Palette, VirtualVRAM, SceneParser, Blitter
+├── tests.py              # Test suite (112 tests, all passing)
 ├── test_data/
-│   ├── palette_ok.json          # Valid 16-color palette
-│   ├── palette_wrong_count.json # Only 3 colors (invalid)
-│   └── palette_wrong_value.json # Component > 255 (invalid)
+│   ├── palette_ok.json             # Valid 16-color palette
+│   ├── palette_wrong_count.json    # Only 3 colors (invalid)
+│   ├── palette_wrong_value.json    # Component > 255 (invalid)
+│   ├── test_boundary_values/       # Per-test directories generated at runtime
+│   ├── test_vram_load_ok/          # Each contains the files written by that test
+│   └── ...                         # (one subdirectory per test that writes files)
 └── pyproject.toml
 ```
 
@@ -99,7 +102,7 @@ Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all
 uv run pytest tests.py -v
 ```
 
-65 tests covering `Palette`, `VirtualVRAM`, and `SceneParser`:
+112 tests covering `Palette`, `VirtualVRAM`, `SceneParser`, and `Blitter`:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -124,10 +127,17 @@ uv run pytest tests.py -v
 - Isolation: sprite 7 filled, sprite 0 untouched
 - Errors: non-int id, id 16, id −1
 
-**SceneParser (27 tests)**
+**SceneParser (28 tests)**
 - Happy path: load, transparent_index, tile_map shape and dtype, sprites list, boundary transparent_index 15, empty sprites, sprite fields
 - File errors: file not found, invalid JSON
 - Missing keys: transparent_index, tile_map, sprites
 - transparent_index errors: not int, too high (16), negative
-- tile_map errors: wrong rows, wrong cols, value 64, negative value
+- tile_map errors: wrong rows, wrong cols, jagged rows, value 64, negative value
 - sprites errors: not a list, missing field, id not int, id out of range, x/y not int, flip_x/flip_y not bool, rotation not int, rotation invalid (45)
+
+**Blitter (46 tests)**
+- init/_validate: valid tile/sprite, all error cases (asset_type, idx, transparent_index)
+- blit_tile: correct write and position, all error cases (row/col type and bounds)
+- _transform: identity, flip_x, flip_y, rotation 90/180/270, flip_x+y
+- _clip: fully inside, centered, clipping on all 4 sides, sprite fully outside frame
+- blit_sprite: all-opaque, all-transparent, mixed transparency, position, clipping on all 4 sides, fully outside frame on all 4 sides, transform+clip combined, z-order
