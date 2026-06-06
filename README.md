@@ -84,7 +84,7 @@ Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all
 ```
 .
 ├── main.py               # Entry point (placeholder)
-├── classes.py            # Palette, VirtualVRAM (and future classes)
+├── classes.py            # Palette, VirtualVRAM, SceneParser (and future classes)
 ├── tests.py              # Test suite (65 tests, all passing)
 ├── test_data/
 │   ├── palette_ok.json          # Valid 16-color palette
@@ -99,7 +99,7 @@ Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all
 uv run pytest tests.py -v
 ```
 
-38 tests covering `Palette` and `VirtualVRAM`:
+65 tests covering `Palette`, `VirtualVRAM`, and `SceneParser`:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -125,7 +125,7 @@ uv run pytest tests.py -v
 - Errors: non-int id, id 16, id −1
 
 **SceneParser (27 tests)**
-- Happy path: load, transparent_index, tile_map shape and dtype, sprites list, boundary transparent_index 15, empty sprites
+- Happy path: load, transparent_index, tile_map shape and dtype, sprites list, boundary transparent_index 15, empty sprites, sprite fields
 - File errors: file not found, invalid JSON
 - Missing keys: transparent_index, tile_map, sprites
 - transparent_index errors: not int, too high (16), negative
