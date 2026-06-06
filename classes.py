@@ -1,5 +1,6 @@
 import numpy as np
 import json
+from PIL import Image
 
 
 class PaletteError(Exception):
@@ -240,7 +241,7 @@ FRAME_H = 480
 
 
 class Blitter:
-    def __init__(self, vram, asset_type, idx, transparent_index, buffer=None):
+    def __init__(self, vram, asset_type, idx, transparent_index, buffer):
         self.__vram = vram
         self.__asset_type, self.__position, self.transparent_index = self._validate(
             asset_type, idx, transparent_index
@@ -345,6 +346,46 @@ class RenderingPipeline:
         self._tiles_path = tiles_path
         self._sprites_path = sprites_path
         self._output_path = output_path
+
+    # Returns an unambiguous string representation of the rendering pipeline.
+    # Input: none.
+    # Output: str.
+    def __repr__(self):
+        return (
+            f"RenderingPipeline(palette_path={self._palette_path!r}, "
+            f"scene_path={self._scene_path!r}, tiles_path={self._tiles_path!r}, "
+            f"sprites_path={self._sprites_path!r}, output_path={self._output_path!r})"
+        )
+
+    # Runs the full pipeline: compose tiles and sprites onto the buffer, then export.
+    # Input: none.
+    # Output: none.
+    def render(self):
+        buf = RenderingPipeline.get_buf()
+        self._compose(buf)
+        self._export(buf)
+
+    # Fills buf with all tiles from tile_map, then all sprites in scene order.
+    # Input: buf — np.ndarray (FRAME_H, FRAME_W) uint8, written in place.
+    # Output: none.
+    def _compose(self, buf):
+        vr = VirtualVRAM(self._tiles_path, self._sprites_path)
+        sp = SceneParser(self._scene_path)
+        for r, row in enumerate(sp.tile_map):
+            for c, tile_id in enumerate(row):
+                Blitter(vr, "tile", int(tile_id), sp.transparent_index, buf).blit_tile(r, c)
+        for sprite in sp.sprites:
+            Blitter(vr, "sprite", sprite["id"], sp.transparent_index, buf).blit_sprite(
+                sprite["x"], sprite["y"], sprite["flip_x"], sprite["flip_y"], sprite["rotation"]
+            )
+
+    # Maps palette indexes in buf to RGB and saves the result as PNG.
+    # Input: buf — np.ndarray (FRAME_H, FRAME_W) uint8 with palette indexes.
+    # Output: none (writes file to self._output_path).
+    def _export(self, buf):
+        palette = Palette(self._palette_path)
+        img = Image.fromarray(palette.data[buf])
+        img.save(self._output_path)
 
     # Creates and returns a blank frame buffer.
     # Input: none.

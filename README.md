@@ -69,7 +69,7 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 | `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices; exposes `get_tile(id)` and `get_sprite(id)` | Done |
 | `SceneParser` | Reads and validates `scene.json`, returns `transparent_index`, `tile_map`, and `sprites` | Done |
 | `Blitter` | Composites tiles and sprites onto a 640×480 frame buffer; applies flip/rotation and transparency | Done |
-| `RenderingPipeline` | Orchestrates the full render and exports PNG | In progress |
+| `RenderingPipeline` | Orchestrates the full render and exports PNG | Done |
 
 Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`, `BlitterException`, `RenderingException`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all file-loading classes.
 
@@ -185,7 +185,7 @@ Raises `RenderingException` on pipeline errors.
 uv run pytest tests.py -v
 ```
 
-112 tests covering `Palette`, `VirtualVRAM`, `SceneParser`, and `Blitter`:
+129 tests covering all classes:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -224,3 +224,10 @@ uv run pytest tests.py -v
 - _transform: identity, flip_x, flip_y, rotation 90/180/270, flip_x+y
 - _clip: fully inside, centered, clipping on all 4 sides, sprite fully outside frame
 - blit_sprite: all-opaque, all-transparent, mixed transparency, position, clipping on all 4 sides, fully outside frame on all 4 sides, transform+clip combined, z-order
+
+**RenderingPipeline (17 tests)**
+- get_buf: shape, dtype, all zeros, independence between calls
+- __repr__: all 5 paths present
+- _export: file created, image size 640×480, pixel color maps correctly from palette
+- _compose: tiles written, full tile_map filled, sprite over tile, transparent sprite not drawn, sprite z-order, sprite transformation applied, sprite clipping at frame edge
+- render(): output file created, output size 640×480

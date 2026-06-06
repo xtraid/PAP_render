@@ -3,6 +3,7 @@ import pytest
 import json
 import numpy as np
 from pathlib import Path
+from PIL import Image as PILImage
 from classes import Palette, PaletteError, VirtualVRAM, VRAMError, SceneParser, SceneError, Blitter, BlitterException, RenderingPipeline, RenderingException, FRAME_W, FRAME_H
 
 VALID = "test_data/palette_ok.json"
@@ -836,3 +837,207 @@ def test_blit_sprite_z_order(test_dir):
     b2 = Blitter(vram2, "sprite", 0, 0, b._buffer)
     b2.blit_sprite(0, 0, False, False, 0)
     assert b2._buffer[0:64, 0:64].min() == 15
+
+
+# -- RenderingPipeline helpers ------------------------------------------------
+
+PIPELINE_PALETTE = [[i * 17, i * 17, i * 17] for i in range(16)]
+
+
+def pack_matrix(matrix):
+    flat = matrix.ravel().astype(np.uint8)
+    return ((flat[0::2] << 4) | flat[1::2]).tobytes()
+
+
+def make_pipeline_palette(base_dir):
+    f = base_dir / "palette.json"
+    f.write_text(json.dumps(PIPELINE_PALETTE))
+    return str(f)
+
+
+def make_pipeline_tiles(base_dir, tile0_index=1):
+    matrix = np.zeros((256, 256), dtype=np.uint8)
+    matrix[0:32, 0:32] = tile0_index
+    f = base_dir / "tiles.bin"
+    f.write_bytes(pack_matrix(matrix))
+    return str(f)
+
+
+def make_pipeline_sprites(base_dir, sprite0_index=2):
+    matrix = np.zeros((256, 256), dtype=np.uint8)
+    matrix[0:64, 0:64] = sprite0_index
+    f = base_dir / "sprites.bin"
+    f.write_bytes(pack_matrix(matrix))
+    return str(f)
+
+
+def make_pipeline_scene(base_dir, transparent_index=0, sprites=None):
+    data = {
+        "transparent_index": transparent_index,
+        "tile_map": [[0] * 20 for _ in range(15)],
+        "sprites": sprites or [],
+    }
+    f = base_dir / "scene.json"
+    f.write_text(json.dumps(data))
+    return str(f)
+
+
+def make_pipeline(base_dir, tile0_index=1, sprite0_index=2, transparent_index=0, sprites=None):
+    palette = make_pipeline_palette(base_dir)
+    tiles = make_pipeline_tiles(base_dir, tile0_index)
+    sprites_bin = make_pipeline_sprites(base_dir, sprite0_index)
+    scene = make_pipeline_scene(base_dir, transparent_index, sprites)
+    output = str(base_dir / "output.png")
+    return RenderingPipeline(palette, scene, tiles, sprites_bin, output)
+
+
+# -- get_buf ------------------------------------------------------------------
+
+def test_pipeline_get_buf_shape():
+    assert RenderingPipeline.get_buf().shape == (FRAME_H, FRAME_W)
+
+def test_pipeline_get_buf_dtype():
+    assert RenderingPipeline.get_buf().dtype == np.uint8
+
+def test_pipeline_get_buf_zeros():
+    assert np.all(RenderingPipeline.get_buf() == 0)
+
+def test_pipeline_get_buf_independent():
+    buf1 = RenderingPipeline.get_buf()
+    buf2 = RenderingPipeline.get_buf()
+    buf1[0, 0] = 5
+    assert buf2[0, 0] == 0
+
+
+# -- __repr__ -----------------------------------------------------------------
+
+def test_pipeline_repr(test_dir):
+    rp = make_pipeline(test_dir)
+    r = repr(rp)
+    assert "palette" in r
+    assert "scene" in r
+    assert "tiles" in r
+    assert "sprites" in r
+    assert "output" in r
+
+
+# -- _export ------------------------------------------------------------------
+
+def test_pipeline_export_creates_file(test_dir):
+    rp = make_pipeline(test_dir)
+    rp._export(RenderingPipeline.get_buf())
+    assert Path(rp._output_path).exists()
+
+def test_pipeline_export_image_size(test_dir):
+    rp = make_pipeline(test_dir)
+    rp._export(RenderingPipeline.get_buf())
+    img = PILImage.open(rp._output_path)
+    assert img.size == (FRAME_W, FRAME_H)
+
+def test_pipeline_export_pixel_color(test_dir):
+    rp = make_pipeline(test_dir)
+    buf = RenderingPipeline.get_buf()
+    buf[0, 0] = 1  # palette index 1 → [17, 17, 17]
+    rp._export(buf)
+    assert PILImage.open(rp._output_path).getpixel((0, 0)) == (17, 17, 17)
+
+
+# -- _compose -----------------------------------------------------------------
+
+def test_pipeline_compose_tiles_written(test_dir):
+    rp = make_pipeline(test_dir, tile0_index=1)
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 1
+
+def test_pipeline_compose_full_tilemap(test_dir):
+    rp = make_pipeline(test_dir, tile0_index=1)
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[479, 639] == 1
+
+def test_pipeline_compose_sprite_over_tile(test_dir):
+    sprite = {"id": 0, "x": 0, "y": 0, "flip_x": False, "flip_y": False, "rotation": 0}
+    rp = make_pipeline(test_dir, tile0_index=1, sprite0_index=2, transparent_index=0, sprites=[sprite])
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 2
+
+def test_pipeline_compose_transparent_sprite_not_drawn(test_dir):
+    sprite = {"id": 0, "x": 0, "y": 0, "flip_x": False, "flip_y": False, "rotation": 0}
+    rp = make_pipeline(test_dir, tile0_index=1, sprite0_index=0, transparent_index=0, sprites=[sprite])
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 1
+
+
+# -- render() -----------------------------------------------------------------
+
+def test_pipeline_render_creates_output(test_dir):
+    rp = make_pipeline(test_dir)
+    rp.render()
+    assert Path(rp._output_path).exists()
+
+def test_pipeline_render_output_size(test_dir):
+    rp = make_pipeline(test_dir)
+    rp.render()
+    assert PILImage.open(rp._output_path).size == (FRAME_W, FRAME_H)
+
+def test_pipeline_compose_sprite_z_order(test_dir):
+    # sprite 0 (index 2) drawn first, sprite 1 (index 3) drawn second at same position — sprite 1 wins
+    matrix = np.zeros((256, 256), dtype=np.uint8)
+    matrix[0:64, 0:64] = 2    # sprite 0
+    matrix[0:64, 64:128] = 3  # sprite 1
+    (test_dir / "sprites.bin").write_bytes(pack_matrix(matrix))
+    scene_data = {
+        "transparent_index": 0,
+        "tile_map": [[0] * 20 for _ in range(15)],
+        "sprites": [
+            {"id": 0, "x": 0, "y": 0, "flip_x": False, "flip_y": False, "rotation": 0},
+            {"id": 1, "x": 0, "y": 0, "flip_x": False, "flip_y": False, "rotation": 0},
+        ],
+    }
+    (test_dir / "scene.json").write_text(json.dumps(scene_data))
+    rp = RenderingPipeline(
+        make_pipeline_palette(test_dir),
+        str(test_dir / "scene.json"),
+        make_pipeline_tiles(test_dir),
+        str(test_dir / "sprites.bin"),
+        str(test_dir / "output.png"),
+    )
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 3
+
+def test_pipeline_compose_sprite_transformation(test_dir):
+    # sprite 0: left half (cols 0-31) opaque index 2, right half transparent index 0
+    # with flip_x the halves swap: buf[0,0] stays tile=1, buf[0,32] becomes 2
+    matrix = np.zeros((256, 256), dtype=np.uint8)
+    matrix[0:64, 0:32] = 2
+    (test_dir / "sprites.bin").write_bytes(pack_matrix(matrix))
+    scene_data = {
+        "transparent_index": 0,
+        "tile_map": [[0] * 20 for _ in range(15)],
+        "sprites": [{"id": 0, "x": 0, "y": 0, "flip_x": True, "flip_y": False, "rotation": 0}],
+    }
+    (test_dir / "scene.json").write_text(json.dumps(scene_data))
+    rp = RenderingPipeline(
+        make_pipeline_palette(test_dir),
+        str(test_dir / "scene.json"),
+        make_pipeline_tiles(test_dir, tile0_index=1),
+        str(test_dir / "sprites.bin"),
+        str(test_dir / "output.png"),
+    )
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 1   # flip moved opaque pixels away from col 0
+    assert buf[0, 32] == 2  # flip moved opaque pixels to col 32
+
+def test_pipeline_compose_sprite_clipping(test_dir):
+    # sprite at x=-32: only cols 32-63 of the sprite are visible (frame cols 0-31)
+    sprite = {"id": 0, "x": -32, "y": 0, "flip_x": False, "flip_y": False, "rotation": 0}
+    rp = make_pipeline(test_dir, tile0_index=1, sprite0_index=2, transparent_index=0, sprites=[sprite])
+    buf = RenderingPipeline.get_buf()
+    rp._compose(buf)
+    assert buf[0, 0] == 2   # visible part of sprite drawn
+    assert buf[0, 32] == 1  # tile only — sprite does not reach here
