@@ -185,7 +185,7 @@ Raises `RenderingException` on pipeline errors.
 uv run pytest tests.py -v
 ```
 
-129 tests covering all classes:
+133 tests covering all classes:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -231,3 +231,9 @@ uv run pytest tests.py -v
 - _export: file created, image size 640×480, pixel color maps correctly from palette
 - _compose: tiles written, full tile_map filled, sprite over tile, transparent sprite not drawn, sprite z-order, sprite transformation applied, sprite clipping at frame edge
 - render(): output file created, output size 640×480
+
+**main.py (4 tests)**
+- `--help` exits with code 0
+- missing arguments exits with non-zero code
+- valid input runs and creates output file
+- invalid file paths propagate `FileNotFoundError`

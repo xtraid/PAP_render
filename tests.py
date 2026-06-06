@@ -1,10 +1,12 @@
 # %%
+import sys
 import pytest
 import json
 import numpy as np
 from pathlib import Path
 from PIL import Image as PILImage
 from classes import Palette, PaletteError, VirtualVRAM, VRAMError, SceneParser, SceneError, Blitter, BlitterException, RenderingPipeline, RenderingException, FRAME_W, FRAME_H
+from main import main
 
 VALID = "test_data/palette_ok.json"
 _TEST_DATA = Path("test_data")
@@ -1041,3 +1043,35 @@ def test_pipeline_compose_sprite_clipping(test_dir):
     rp._compose(buf)
     assert buf[0, 0] == 2   # visible part of sprite drawn
     assert buf[0, 32] == 1  # tile only — sprite does not reach here
+
+
+# -- main ---------------------------------------------------------------------
+
+def test_main_help(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["main.py", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+
+def test_main_missing_args(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["main.py"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+
+def test_main_runs_ok(monkeypatch, test_dir):
+    rp = make_pipeline(test_dir)
+    monkeypatch.setattr(sys, "argv", [
+        "main.py", rp._palette_path, rp._scene_path,
+        rp._tiles_path, rp._sprites_path, rp._output_path,
+    ])
+    main()
+    assert Path(rp._output_path).exists()
+
+def test_main_file_not_found(monkeypatch, test_dir):
+    output = str(test_dir / "output.png")
+    monkeypatch.setattr(sys, "argv", [
+        "main.py", "no.json", "no.json", "no.bin", "no.bin", output,
+    ])
+    with pytest.raises(FileNotFoundError):
+        main()
