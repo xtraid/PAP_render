@@ -69,9 +69,92 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 | `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices; exposes `get_tile(id)` and `get_sprite(id)` | Done |
 | `SceneParser` | Reads and validates `scene.json`, returns `transparent_index`, `tile_map`, and `sprites` | Done |
 | `Blitter` | Composites tiles and sprites onto a 640×480 frame buffer; applies flip/rotation and transparency | Done |
-| `RenderingPipeline` | Orchestrates the full render and exports PNG | Planned |
+| `RenderingPipeline` | Orchestrates the full render and exports PNG | In progress |
 
-Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`, `BlitterException`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all file-loading classes.
+Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`, `BlitterException`, `RenderingException`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all file-loading classes.
+
+## API Reference
+
+### Palette
+
+```python
+Palette(path: str)
+```
+
+| Member | Type | Description |
+|---|---|---|
+| `data` | `np.ndarray (16, 3) uint8` | Full palette array |
+| `__getitem__(idx: int)` | `np.ndarray (3,) uint8` | RGB color at palette index `idx` ∈ [0, 15] |
+| `print_palette()` | `None` | Prints palette to stdout |
+
+Raises `PaletteError` on invalid palette. Raises `FileNotFoundError` if file is missing.
+
+---
+
+### VirtualVRAM
+
+```python
+VirtualVRAM(path_t: str, path_s: str)
+```
+
+| Member | Type | Description |
+|---|---|---|
+| `get_tile(idx: int)` | `np.ndarray (32, 32) uint8` | Palette-index matrix for tile `idx` ∈ [0, 63] |
+| `get_sprite(idx: int)` | `np.ndarray (64, 64) uint8` | Palette-index matrix for sprite `idx` ∈ [0, 15] |
+
+Raises `VRAMError` on invalid file size. Raises `FileNotFoundError` if a file is missing.
+
+---
+
+### SceneParser
+
+```python
+SceneParser(path: str)
+```
+
+| Member | Type | Description |
+|---|---|---|
+| `transparent_index` | `int` | Palette index treated as transparent, ∈ [0, 15] |
+| `tile_map` | `np.ndarray (15, 20) uint8` | Grid of tile IDs |
+| `sprites` | `list[dict]` | Ordered sprite list; each dict has `id`, `x`, `y`, `flip_x`, `flip_y`, `rotation` |
+
+Raises `SceneError` on invalid scene. Raises `FileNotFoundError` if file is missing.
+
+---
+
+### Blitter
+
+```python
+Blitter(vram: VirtualVRAM, asset_type: str, idx: int, transparent_index: int, buffer: np.ndarray)
+```
+
+| Member | Type | Description |
+|---|---|---|
+| `transparent_index` | `int` | Palette index treated as transparent |
+| `_buffer` | `np.ndarray (480, 640) uint8` | Shared frame buffer written in place |
+| `blit_tile(row: int, col: int)` | `None` | Copies tile onto buffer at tilemap cell (`row` ∈ [0,14], `col` ∈ [0,19]) |
+| `blit_sprite(x, y, flip_x, flip_y, rotation)` | `None` | Transforms and blits sprite at top-left `(x, y)`; transparent pixels are skipped |
+| `_transform(sprite_matrix, flip_x, flip_y, rotation)` | `np.ndarray (64, 64) uint8` | Applies flip then rotation to a sprite matrix |
+| `_clip(x: int, y: int)` | `tuple[tuple[slice, slice], tuple[slice, slice]]` | Returns `(dst, src)` slice pairs for a 64×64 sprite at `(x, y)` |
+
+Raises `BlitterException` on invalid arguments.
+
+---
+
+### RenderingPipeline
+
+```python
+RenderingPipeline(palette_path, scene_path, tiles_path, sprites_path, output_path)
+```
+
+| Member | Type | Description |
+|---|---|---|
+| `get_buf()` | `np.ndarray (480, 640) uint8` | classmethod — creates a blank frame buffer |
+| `render()` | `None` | Runs full pipeline: compose tiles + sprites, export PNG |
+| `_compose(buf: np.ndarray)` | `None` | Fills `buf` with tiles then sprites in scene order |
+| `_export(buf: np.ndarray)` | `None` | Maps palette indexes → RGB, saves PNG via Pillow |
+
+Raises `RenderingException` on pipeline errors.
 
 ## Requirements
 
@@ -84,7 +167,7 @@ Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`, `BlitterException`
 ```
 .
 ├── main.py               # Entry point (placeholder)
-├── classes.py            # Palette, VirtualVRAM, SceneParser, Blitter
+├── classes.py            # Palette, VirtualVRAM, SceneParser, Blitter, RenderingPipeline
 ├── tests.py              # Test suite (112 tests, all passing)
 ├── test_data/
 │   ├── palette_ok.json             # Valid 16-color palette

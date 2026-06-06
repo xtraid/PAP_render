@@ -3,7 +3,7 @@ import pytest
 import json
 import numpy as np
 from pathlib import Path
-from classes import Palette, PaletteError, VirtualVRAM, VRAMError, SceneParser, SceneError, Blitter, BlitterException, FRAME_W, FRAME_H
+from classes import Palette, PaletteError, VirtualVRAM, VRAMError, SceneParser, SceneError, Blitter, BlitterException, RenderingPipeline, RenderingException, FRAME_W, FRAME_H
 
 VALID = "test_data/palette_ok.json"
 _TEST_DATA = Path("test_data")
@@ -540,111 +540,111 @@ def make_vram(base_dir, tile_data=None, sprite_data=None):
 
 def test_blitter_init_tile_ok(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     assert b.transparent_index == 0
     assert b._buffer.shape == (FRAME_H, FRAME_W)
     assert b._buffer.dtype == np.uint8
 
 def test_blitter_init_sprite_ok(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 15, 7)
+    b = Blitter(vram, "sprite", 15, 7, RenderingPipeline.get_buf())
     assert b.transparent_index == 7
 
 def test_blitter_invalid_asset_type(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "block", 0, 0)
+        Blitter(vram, "block", 0, 0, RenderingPipeline.get_buf())
 
 def test_blitter_idx_not_int(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", "0", 0)
+        Blitter(vram, "tile", "0", 0, RenderingPipeline.get_buf())
 
 def test_blitter_tile_idx_out_of_range_high(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", 64, 0)
+        Blitter(vram, "tile", 64, 0, RenderingPipeline.get_buf())
 
 def test_blitter_tile_idx_out_of_range_low(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", -1, 0)
+        Blitter(vram, "tile", -1, 0, RenderingPipeline.get_buf())
 
 def test_blitter_sprite_idx_out_of_range_high(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "sprite", 16, 0)
+        Blitter(vram, "sprite", 16, 0, RenderingPipeline.get_buf())
 
 def test_blitter_sprite_idx_out_of_range_low(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "sprite", -1, 0)
+        Blitter(vram, "sprite", -1, 0, RenderingPipeline.get_buf())
 
 def test_blitter_transparent_index_not_int(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", 0, "0")
+        Blitter(vram, "tile", 0, "0", RenderingPipeline.get_buf())
 
 def test_blitter_transparent_index_too_high(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", 0, 16)
+        Blitter(vram, "tile", 0, 16, RenderingPipeline.get_buf())
 
 def test_blitter_transparent_index_negative(test_dir):
     vram = make_vram(test_dir)
     with pytest.raises(BlitterException):
-        Blitter(vram, "tile", 0, -1)
+        Blitter(vram, "tile", 0, -1, RenderingPipeline.get_buf())
 
 
 # -- blit_tile ----------------------------------------------------------------
 
 def test_blit_tile_writes_to_buffer(test_dir):
     vram = make_vram(test_dir, tile_data=make_tile_sheet(0, 0xFF))
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     b.blit_tile(0, 0)
     assert b._buffer[0:32, 0:32].min() == 15
     assert b._buffer[0:32, 0:32].max() == 15
 
 def test_blit_tile_correct_position(test_dir):
     vram = make_vram(test_dir, tile_data=make_tile_sheet(0, 0xFF))
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     b.blit_tile(1, 2)
     assert b._buffer[32:64, 64:96].min() == 15
     assert b._buffer[0:32, 0:32].max() == 0
 
 def test_blit_tile_row_not_int(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile("0", 0)
 
 def test_blit_tile_col_not_int(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile(0, "0")
 
 def test_blit_tile_row_out_of_range_high(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile(15, 0)
 
 def test_blit_tile_row_out_of_range_low(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile(-1, 0)
 
 def test_blit_tile_col_out_of_range_high(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile(0, 20)
 
 def test_blit_tile_col_out_of_range_low(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "tile", 0, 0)
+    b = Blitter(vram, "tile", 0, 0, RenderingPipeline.get_buf())
     with pytest.raises(BlitterException):
         b.blit_tile(0, -1)
 
@@ -653,43 +653,43 @@ def test_blit_tile_col_out_of_range_low(test_dir):
 
 def test_transform_identity(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, False, False, 0), m)
 
 def test_transform_flip_x(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, True, False, 0), np.fliplr(m))
 
 def test_transform_flip_y(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, False, True, 0), np.flipud(m))
 
 def test_transform_rotation_90(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, False, False, 90), np.rot90(m, 1))
 
 def test_transform_rotation_180(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, False, False, 180), np.rot90(m, 2))
 
 def test_transform_rotation_270(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, False, False, 270), np.rot90(m, 3))
 
 def test_transform_flip_x_and_y(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     m = np.arange(64 * 64, dtype=np.uint8).reshape(64, 64) % 16
     assert np.array_equal(b._transform(m, True, True, 0), np.flipud(np.fliplr(m)))
 
@@ -698,42 +698,42 @@ def test_transform_flip_x_and_y(test_dir):
 
 def test_clip_fully_inside(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(0, 0)
     assert dst == (slice(0, 64), slice(0, 64))
     assert src == (slice(0, 64), slice(0, 64))
 
 def test_clip_centered(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(100, 50)
     assert dst == (slice(50, 114), slice(100, 164))
     assert src == (slice(0, 64), slice(0, 64))
 
 def test_clip_top(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(0, -10)
     assert dst == (slice(0, 54), slice(0, 64))
     assert src == (slice(10, 64), slice(0, 64))
 
 def test_clip_left(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(-10, 0)
     assert dst == (slice(0, 64), slice(0, 54))
     assert src == (slice(0, 64), slice(10, 64))
 
 def test_clip_bottom(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(0, FRAME_H - 32)
     assert dst == (slice(FRAME_H - 32, FRAME_H), slice(0, 64))
     assert src == (slice(0, 32), slice(0, 64))
 
 def test_clip_right(test_dir):
     vram = make_vram(test_dir)
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     dst, src = b._clip(FRAME_W - 32, 0)
     assert dst == (slice(0, 64), slice(FRAME_W - 32, FRAME_W))
     assert src == (slice(0, 64), slice(0, 32))
@@ -743,27 +743,27 @@ def test_clip_right(test_dir):
 
 def test_blit_sprite_all_opaque(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, 0, False, False, 0)
     assert b._buffer[0:64, 0:64].min() == 15
     assert b._buffer[0:64, 0:64].max() == 15
 
 def test_blit_sprite_all_transparent(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0x00))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, 0, False, False, 0)
     assert b._buffer[0:64, 0:64].max() == 0
 
 def test_blit_sprite_correct_position(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(100, 50, False, False, 0)
     assert b._buffer[50:114, 100:164].min() == 15
     assert b._buffer[0:50, 0:100].max() == 0
 
 def test_blit_sprite_clipping_left(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(-32, 0, False, False, 0)
     assert b._buffer[0:64, 0:32].min() == 15
     assert b._buffer[0:64, 32:64].max() == 0
@@ -771,69 +771,68 @@ def test_blit_sprite_clipping_left(test_dir):
 def test_blit_sprite_mixed_transparency(test_dir):
     # 0xF0 → pixels alternano 15 (opaco) e 0 (trasparente)
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xF0))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, 0, False, False, 0)
     assert b._buffer[0, 0] == 15
     assert b._buffer[0, 1] == 0
 
 def test_blit_sprite_clipping_top(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, -32, False, False, 0)
     assert b._buffer[0:32, 0:64].min() == 15
     assert b._buffer[32:64, 0:64].max() == 0
 
 def test_blit_sprite_clipping_right(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(FRAME_W - 32, 0, False, False, 0)
     assert b._buffer[0:64, FRAME_W - 32:FRAME_W].min() == 15
     assert b._buffer[0:64, FRAME_W - 96:FRAME_W - 32].max() == 0
 
 def test_blit_sprite_clipping_bottom(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, FRAME_H - 32, False, False, 0)
     assert b._buffer[FRAME_H - 32:FRAME_H, 0:64].min() == 15
     assert b._buffer[FRAME_H - 96:FRAME_H - 32, 0:64].max() == 0
 
 def test_blit_sprite_fully_outside_right(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(FRAME_W, 0, False, False, 0)
     assert b._buffer.max() == 0
 
 def test_blit_sprite_fully_outside_bottom(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, FRAME_H, False, False, 0)
     assert b._buffer.max() == 0
 
 def test_blit_sprite_fully_outside_left(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(-64, 0, False, False, 0)
     assert b._buffer.max() == 0
 
 def test_blit_sprite_fully_outside_top(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, -64, False, False, 0)
     assert b._buffer.max() == 0
 
 def test_blit_sprite_transform_and_clip(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(-32, 0, True, False, 90)
     assert b._buffer[0:64, 0:32].min() == 15
 
 def test_blit_sprite_z_order(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
-    b = Blitter(vram, "sprite", 0, 0)
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
     b.blit_sprite(0, 0, False, False, 0)
     # second blit with all-transparent sprite should not overwrite
     vram2 = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0x00))
-    b2 = Blitter(vram2, "sprite", 0, 0)
-    b2._buffer = b._buffer
+    b2 = Blitter(vram2, "sprite", 0, 0, b._buffer)
     b2.blit_sprite(0, 0, False, False, 0)
     assert b2._buffer[0:64, 0:64].min() == 15

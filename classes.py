@@ -179,7 +179,9 @@ class SceneParser:
             raise SceneError(f"tile_map must have 15 rows, got {len(tile_map)}")
         for i, row in enumerate(tile_map):
             if len(row) != 20:
-                raise SceneError(f"tile_map row {i} must have 20 columns, got {len(row)}")
+                raise SceneError(
+                    f"tile_map row {i} must have 20 columns, got {len(row)}"
+                )
         if any(not 0 <= v <= 63 for row in tile_map for v in row):
             raise SceneError("tile_map values must be in [0, 63]")
         if not isinstance(sprites, list):
@@ -238,10 +240,12 @@ FRAME_H = 480
 
 
 class Blitter:
-    def __init__(self, vram, asset_type, idx, transparent_index):
+    def __init__(self, vram, asset_type, idx, transparent_index, buffer=None):
         self.__vram = vram
-        self.__asset_type, self.__position, self.transparent_index = self._validate(asset_type, idx, transparent_index)
-        self._buffer = Blitter.get_buf()
+        self.__asset_type, self.__position, self.transparent_index = self._validate(
+            asset_type, idx, transparent_index
+        )
+        self._buffer = buffer
 
     # Validates asset_type, idx and transparent_index.
     # Input: asset_type — "tile" or "sprite"; idx — int index into the respective sheet; transparent_index — palette index 0-15.
@@ -258,9 +262,13 @@ class Blitter:
         if asset_type == "sprite" and not 0 <= idx <= 15:
             raise BlitterException(f"sprite idx must be in [0, 15], got {idx}")
         if not isinstance(transparent_index, int):
-            raise BlitterException(f"transparent_index must be int, got {type(transparent_index).__name__}")
+            raise BlitterException(
+                f"transparent_index must be int, got {type(transparent_index).__name__}"
+            )
         if not 0 <= transparent_index <= 15:
-            raise BlitterException(f"transparent_index must be in [0, 15], got {transparent_index}")
+            raise BlitterException(
+                f"transparent_index must be in [0, 15], got {transparent_index}"
+            )
         return asset_type, idx, transparent_index
 
     # Blits the tile at self.__position onto the frame buffer at the given tilemap cell.
@@ -322,12 +330,25 @@ class Blitter:
         dst, src = self._clip(x, y)
         self._buffer[dst][mask[src]] = sprite_buf[src][mask[src]]
 
+    def __repr__(self):
+        return f"Blitter(asset_type={self.__asset_type!r}, position={self.__position})"
+
+
+class RenderingException(Exception):
+    pass
+
+
+class RenderingPipeline:
+    def __init__(self, palette_path, scene_path, tiles_path, sprites_path, output_path):
+        self._palette_path = palette_path
+        self._scene_path = scene_path
+        self._tiles_path = tiles_path
+        self._sprites_path = sprites_path
+        self._output_path = output_path
+
     # Creates and returns a blank frame buffer.
     # Input: none.
     # Output: np.ndarray of shape (FRAME_H, FRAME_W) dtype uint8, all zeros.
     @classmethod
     def get_buf(cls):
         return np.zeros((FRAME_H, FRAME_W), dtype=np.uint8)
-
-    def __repr__(self):
-        return f"Blitter(asset_type={self.__asset_type!r}, position={self.__position})"
