@@ -18,6 +18,8 @@ class Palette:
         try:
             with open(self.__path) as f:
                 raw = json.load(f)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"palette file not found: {self.__path!r}") from e
         except json.JSONDecodeError as e:
             raise PaletteError(f"file JSON not valid: {e}") from e
         if len(raw) != 16:
@@ -66,8 +68,8 @@ class VirtualVRAM:
         self.__path_tiles = path_t
         self.__path_sprites = path_s
         self.__tiles, self.__sprites = self._load_bin()
-        self.tiles_mx = self._decode(self.__tiles)
-        self.sprites_mx = self._decode(self.__sprites)
+        self._tiles_mx = self._decode(self.__tiles)
+        self._sprites_mx = self._decode(self.__sprites)
 
     # Reads the tile sheet and sprite sheet binary files.
     # Input: self.__path_tiles, self.__path_sprites — paths to nibble-packed binary files.
@@ -76,11 +78,19 @@ class VirtualVRAM:
         try:
             with open(self.__path_tiles, "rb") as ftile:
                 tiles = ftile.read()
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"tiles file not found: {self.__path_tiles!r}"
+            ) from e
         except OSError as e:
             raise VRAMError(f"cannot open {self.__path_tiles!r}: {e}") from e
         try:
             with open(self.__path_sprites, "rb") as fsprite:
                 sprites = fsprite.read()
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"sprites file not found: {self.__path_sprites!r}"
+            ) from e
         except OSError as e:
             raise VRAMError(f"cannot open {self.__path_sprites!r}: {e}") from e
         return tiles, sprites
@@ -94,5 +104,123 @@ class VirtualVRAM:
         data = np.frombuffer(raw, dtype=np.uint8)
         return np.stack([data >> 4, data & 0x0F], axis=1).ravel().reshape(256, 256)
 
+    # Returns the tile at the given index as a palette-index matrix.
+    # Input: idx — integer in [0, 63].
+    # Output: np.ndarray of shape (32, 32) dtype uint8 with palette indexes 0-15.
+    def get_tile(self, idx):
+        if not isinstance(idx, int):
+            raise VRAMError(f"index must be int, got {type(idx).__name__}")
+        if not 0 <= idx <= 63:
+            raise VRAMError(f"index must be in [0, 63], got {idx}")
+        row = idx // 8
+        col = idx % 8
+        return self._tiles_mx[row * 32 : row * 32 + 32, col * 32 : col * 32 + 32]
+
+    # Returns the sprite at the given index as a palette-index matrix.
+    # Input: idx — integer in [0, 15].
+    # Output: np.ndarray of shape (64, 64) dtype uint8 with palette indexes 0-15.
+    def get_sprite(self, idx):
+        if not isinstance(idx, int):
+            raise VRAMError(f"index must be int, got {type(idx).__name__}")
+        if not 0 <= idx <= 15:
+            raise VRAMError(f"index must be in [0, 15], got {idx}")
+        row = idx // 4
+        col = idx % 4
+        return self._sprites_mx[row * 64 : row * 64 + 64, col * 64 : col * 64 + 64]
+
     def __repr__(self):
-        return f"VirtualVRAM(path_t={self.__path_tiles!r}, path_s={self.__path_sprites!r})"
+        return (
+            f"VirtualVRAM(path_t={self.__path_tiles!r}, path_s={self.__path_sprites!r})"
+        )
+
+
+class SceneError(Exception):
+    pass
+
+
+class SceneParser:
+    def __init__(self, path):
+        self.__path = path
+        raw = self._load_descriptor()
+        self.transparent_index, self.tile_map, self.sprites = self._validate(raw)
+
+    # Reads the scene JSON file.
+    # Input: self.__path — path to a JSON file describing the scene.
+    # Output: dict with the raw parsed JSON content.
+    def _load_descriptor(self):
+        try:
+            with open(self.__path) as f:
+                raw = json.load(f)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"scene file not found: {self.__path!r}") from e
+        except json.JSONDecodeError as e:
+            raise SceneError(f"file JSON not valid: {e}") from e
+        return raw
+
+    # Validates the raw scene dict and returns typed, checked fields.
+    # Input: raw — dict from _load_descriptor.
+    # Output: tuple (transparent_index: int, tile_map: np.ndarray (15,20) uint8, sprites: list of dict).
+    def _validate(self, raw):
+        for key in ("transparent_index", "tile_map", "sprites"):
+            if key not in raw:
+                raise SceneError(f"missing key: {key!r}")
+        transparent_idx = raw["transparent_index"]
+        tile_map = raw["tile_map"]
+        sprites = raw["sprites"]
+        if not isinstance(transparent_idx, int):
+            raise SceneError(
+                f"transparent_index must be int, got {type(transparent_idx).__name__}"
+            )
+        if not 0 <= transparent_idx <= 15:
+            raise SceneError(
+                f"transparent_index must be in [0, 15], got {transparent_idx}"
+            )
+        if len(tile_map) != 15 or len(tile_map[0]) != 20:
+            raise SceneError(
+                f"tile_map must be 15 x 20, got {len(tile_map)} x {len(tile_map[0])}"
+            )
+        if any(not 0 <= v <= 63 for row in tile_map for v in row):
+            raise SceneError("tile_map values must be in [0, 63]")
+        if not isinstance(sprites, list):
+            raise SceneError(f"sprites must be a list, got {type(sprites).__name__}")
+        for i, sprite in enumerate(sprites):
+            for key in ("id", "x", "y", "flip_x", "flip_y", "rotation"):
+                if key not in sprite:
+                    raise SceneError(f"sprite {i}: missing key {key!r}")
+            if not isinstance(sprite["id"], int):
+                raise SceneError(
+                    f"sprite {i}: id must be int, got {type(sprite['id']).__name__}"
+                )
+            if not 0 <= sprite["id"] <= 15:
+                raise SceneError(f"sprite {i}: id must be in [0, 15], got {sprite['id']}")
+            if not isinstance(sprite["x"], int):
+                raise SceneError(
+                    f"sprite {i}: x must be int, got {type(sprite['x']).__name__}"
+                )
+            if not isinstance(sprite["y"], int):
+                raise SceneError(
+                    f"sprite {i}: y must be int, got {type(sprite['y']).__name__}"
+                )
+            if not isinstance(sprite["flip_x"], bool):
+                raise SceneError(
+                    f"sprite {i}: flip_x must be bool, got {type(sprite['flip_x']).__name__}"
+                )
+            if not isinstance(sprite["flip_y"], bool):
+                raise SceneError(
+                    f"sprite {i}: flip_y must be bool, got {type(sprite['flip_y']).__name__}"
+                )
+            if not isinstance(sprite["rotation"], int):
+                raise SceneError(
+                    f"sprite {i}: rotation must be int, got {type(sprite['rotation']).__name__}"
+                )
+            if sprite["rotation"] not in {0, 90, 180, 270}:
+                raise SceneError(
+                    f"sprite {i}: rotation must be in {{0, 90, 180, 270}}, got {sprite['rotation']}"
+                )
+        return transparent_idx, np.array(tile_map, np.uint8), sprites
+
+    # Returns an unambiguous string representation of the scene parser.
+    # Input: none.
+    # Output: str.
+    def __repr__(self):
+        return f"SceneParser(path={self.__path!r})"

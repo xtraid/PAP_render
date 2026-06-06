@@ -39,14 +39,14 @@
                           [255,128,0]
                       ]
 
- - [ ] read tile and sprite binaries
+ - [x] read tile and sprite binaries
      \saved as packed binary as 256*256 matrix
          |- packed binary are ( 256 * 256 ) / 2 bytes (file 32768 byte) (each byte contains 2 pixel)
              \foreach byte
                |- high nibble (bit 7-4) ~ first pixel  => palette index 0-15
                |- low  nibble (bit 3-0) ~ second pixel => palette index 0-15
 
- - [ ] the scene is saved in a JSON
+ - [x] the scene is saved in a JSON
      \is organized such as
        |- 1. transparent_index ( palette index 0-15 treated as transparent )
        |- 2. tile_map ( matrix 15 * 20 of tile IDs 0-63 )
@@ -94,7 +94,7 @@
     \foreach pixel
       |- has just 1 reference to a color ~ 4 bit
 
-- [ ] a tile sheet:
+- [x] a tile sheet:
     \is 256*256
       |-\has 64 tiles \in grid 8*8
     \foreach tile
@@ -111,7 +111,7 @@
                            | tile 56       ... tile 63  |
                            |----------------------------|
 
-- [ ] a sprite sheet:
+- [x] a sprite sheet:
     \is 256*256 pixel
       |-\has 16 sprites \in grid 4*4
     \foreach sprite
@@ -158,8 +158,8 @@
 
 # CLASSES:
       |- [x] 1. class Palette that takes a JSON path, reads and validates the palette and makes an index to the respective RGB value
-      |- [ ] 2. class VirtualVRAM which uploads the tile sheet and sprite sheet from the respective binaries, decodes the 4 bit sequences in a matrix of palette indexes
-      |- [ ] 3. class SceneParser which reads a JSON and gives back the description of the frame buffer and of the sprites
+      |- [x] 2. class VirtualVRAM which uploads the tile sheet and sprite sheet from the respective binaries, decodes the 4 bit sequences in a matrix of palette indexes
+      |- [x] 3. class SceneParser which reads a JSON and gives back the description of the frame buffer and of the sprites
       |- [ ] 4. class Blitter which gets tiles and sprites from the respective sheets, applies flip, rotations and transparency and draws the final result in the background
       |- [ ] 5. class RenderingPipeline which calls and executes the complete composition of the scene and exports it as png
 

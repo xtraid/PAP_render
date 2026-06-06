@@ -66,12 +66,12 @@ Packed binary, 256×256 pixels stored as 32768 bytes. Each byte contains 2 pixel
 | Class | Responsibility | Status |
 |---|---|---|
 | `Palette` | Reads and validates `palette.json`, maps index → RGB | Done |
-| `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices | Done |
-| `SceneParser` | Reads `scene.json`, returns tile map and sprite list | Planned |
+| `VirtualVRAM` | Loads `.bin` files, decodes nibble-packed pixels into index matrices; exposes `get_tile(id)` and `get_sprite(id)` | Done |
+| `SceneParser` | Reads and validates `scene.json`, returns `transparent_index`, `tile_map`, and `sprites` | Done |
 | `Blitter` | Applies transformations and transparency, composites tiles and sprites | Planned |
 | `RenderingPipeline` | Orchestrates the full render and exports PNG | Planned |
 
-Custom exceptions (`PaletteError`, `VRAMError`) are raised for all invalid input cases.
+Custom exceptions (`PaletteError`, `VRAMError`, `SceneError`) are raised for all invalid input cases. `FileNotFoundError` propagates with a descriptive message from all three classes.
 
 ## Requirements
 
@@ -85,7 +85,7 @@ Custom exceptions (`PaletteError`, `VRAMError`) are raised for all invalid input
 .
 ├── main.py               # Entry point (placeholder)
 ├── classes.py            # Palette, VirtualVRAM (and future classes)
-├── tests.py              # Test suite (24 tests, all passing)
+├── tests.py              # Test suite (65 tests, all passing)
 ├── test_data/
 │   ├── palette_ok.json          # Valid 16-color palette
 │   ├── palette_wrong_count.json # Only 3 colors (invalid)
@@ -99,7 +99,7 @@ Custom exceptions (`PaletteError`, `VRAMError`) are raised for all invalid input
 uv run pytest tests.py -v
 ```
 
-24 tests covering `Palette` and `VirtualVRAM`:
+38 tests covering `Palette` and `VirtualVRAM`:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -109,7 +109,25 @@ uv run pytest tests.py -v
 - Out-of-range values: above 255, negative, exact 255
 - `__getitem__` bounds: index 16 and index −1
 
-**VirtualVRAM (8 tests)**
+**VirtualVRAM — decode (8 tests)**
 - Happy path: load, shape and dtype, all-zeros decode, all-`0xFF` decode, nibble split (`0xAB` → 10, 11)
 - File errors: tiles not found, sprites not found
 - Wrong size: tiles file too short, sprites file too short
+
+**VirtualVRAM — get_tile (7 tests)**
+- Happy path: shape and dtype, first tile (id 0) all 15, last tile (id 63) all 15
+- Isolation: tile 5 filled, tile 0 untouched
+- Errors: non-int id, id 64, id −1
+
+**VirtualVRAM — get_sprite (7 tests)**
+- Happy path: shape and dtype, first sprite (id 0) all 15, last sprite (id 15) all 15
+- Isolation: sprite 7 filled, sprite 0 untouched
+- Errors: non-int id, id 16, id −1
+
+**SceneParser (27 tests)**
+- Happy path: load, transparent_index, tile_map shape and dtype, sprites list, boundary transparent_index 15, empty sprites
+- File errors: file not found, invalid JSON
+- Missing keys: transparent_index, tile_map, sprites
+- transparent_index errors: not int, too high (16), negative
+- tile_map errors: wrong rows, wrong cols, value 64, negative value
+- sprites errors: not a list, missing field, id not int, id out of range, x/y not int, flip_x/flip_y not bool, rotation not int, rotation invalid (45)
