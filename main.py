@@ -10,7 +10,9 @@ def main():
     parser.add_argument("sprites", help="path to sprites.bin")
     parser.add_argument("output", help="path to output PNG")
     args = parser.parse_args()
-    RenderingPipeline(args.palette, args.scene, args.tiles, args.sprites, args.output).render()
+    RenderingPipeline(
+        args.palette, args.scene, args.tiles, args.sprites, args.output
+    ).render()
 
 
 if __name__ == "__main__":

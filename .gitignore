@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Project notes / assignment (not part of the deliverable)
+CLAUDE.md

@@ -9,14 +9,13 @@ from classes import Palette, PaletteError, VirtualVRAM, VRAMError, SceneParser, 
 from main import main
 
 VALID = "test_data/palette_ok.json"
-_TEST_DATA = Path("test_data")
 
 
 @pytest.fixture
-def test_dir(request):
-    d = _TEST_DATA / request.node.name
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+def test_dir(tmp_path):
+    # File generati dai test finiscono nella tmp dir per-test di pytest,
+    # non nella cartella del repo.
+    return tmp_path
 
 
 def make_tmp(base_dir, data):
@@ -99,6 +98,17 @@ def test_value_above_255(test_dir):
 
 def test_value_negative(test_dir):
     data = [[-1, 0, 0]] + [[0, 0, 0]] * 15
+    with pytest.raises(PaletteError):
+        Palette(make_tmp(test_dir, data))
+
+# C4 regression: a color component must be an integer (the PDF says integers).
+def test_value_float_component(test_dir):
+    data = [[255.5, 0, 0]] + [[0, 0, 0]] * 15
+    with pytest.raises(PaletteError):
+        Palette(make_tmp(test_dir, data))
+
+def test_value_bool_component(test_dir):
+    data = [[True, 0, 0]] + [[0, 0, 0]] * 15
     with pytest.raises(PaletteError):
         Palette(make_tmp(test_dir, data))
 
@@ -429,6 +439,37 @@ def test_scene_transparent_index_negative(test_dir):
         SceneParser(make_scene(test_dir, data))
 
 
+# -- C2 regression: bool rejected where int is required -----------------------
+# In Python bool is a subclass of int, so a JSON `true` would pass isinstance int.
+
+def test_scene_transparent_index_bool(test_dir):
+    data = valid_scene()
+    data["transparent_index"] = True
+    with pytest.raises(SceneError):
+        SceneParser(make_scene(test_dir, data))
+
+def test_scene_tile_map_bool(test_dir):
+    data = valid_scene()
+    data["tile_map"] = [[0] * 20 for _ in range(15)]
+    data["tile_map"][0][0] = True
+    with pytest.raises(SceneError):
+        SceneParser(make_scene(test_dir, data))
+
+def test_scene_sprite_x_bool(test_dir):
+    data = valid_scene()
+    data["sprites"] = [{"id": 0, "x": True, "y": 0,
+                        "flip_x": False, "flip_y": False, "rotation": 0}]
+    with pytest.raises(SceneError):
+        SceneParser(make_scene(test_dir, data))
+
+def test_scene_sprite_rotation_bool(test_dir):
+    data = valid_scene()
+    data["sprites"] = [{"id": 0, "x": 0, "y": 0,
+                        "flip_x": False, "flip_y": False, "rotation": True}]
+    with pytest.raises(SceneError):
+        SceneParser(make_scene(test_dir, data))
+
+
 # -- SceneParser tile_map errors ----------------------------------------------
 
 def test_scene_tile_map_wrong_rows(test_dir):
@@ -452,6 +493,12 @@ def test_scene_tile_map_value_too_high(test_dir):
 def test_scene_tile_map_value_negative(test_dir):
     data = valid_scene()
     data["tile_map"][0][0] = -1
+    with pytest.raises(SceneError):
+        SceneParser(make_scene(test_dir, data))
+
+def test_scene_tile_map_value_not_int(test_dir):
+    data = valid_scene()
+    data["tile_map"][0][0] = 1.5
     with pytest.raises(SceneError):
         SceneParser(make_scene(test_dir, data))
 
@@ -824,6 +871,27 @@ def test_blit_sprite_fully_outside_top(test_dir):
     b.blit_sprite(0, -64, False, False, 0)
     assert b._buffer.max() == 0
 
+# C1 regression: sprite beyond the positive edge (x > FRAME_W, y > FRAME_H).
+# Before the _clip fix the negative dst width produced inconsistent src slices
+# -> IndexError. The exact-edge tests (FRAME_W/-64) did not catch it.
+def test_blit_sprite_beyond_right_no_crash(test_dir):
+    vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
+    b.blit_sprite(FRAME_W + 60, 32, False, False, 0)
+    assert b._buffer.max() == 0
+
+def test_blit_sprite_beyond_bottom_no_crash(test_dir):
+    vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
+    b.blit_sprite(32, FRAME_H + 20, False, False, 0)
+    assert b._buffer.max() == 0
+
+def test_blit_sprite_far_left_no_crash(test_dir):
+    vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
+    b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
+    b.blit_sprite(-100, 32, False, False, 0)
+    assert b._buffer.max() == 0
+
 def test_blit_sprite_transform_and_clip(test_dir):
     vram = make_vram(test_dir, sprite_data=make_sprite_sheet(0, 0xFF))
     b = Blitter(vram, "sprite", 0, 0, RenderingPipeline.get_buf())
@@ -942,6 +1010,12 @@ def test_pipeline_export_pixel_color(test_dir):
     buf[0, 0] = 1  # palette index 1 → [17, 17, 17]
     rp._export(buf)
     assert PILImage.open(rp._output_path).getpixel((0, 0)) == (17, 17, 17)
+
+def test_pipeline_export_bad_path(test_dir):
+    rp = make_pipeline(test_dir)
+    rp._output_path = str(test_dir / "non_esiste" / "output.png")  # directory mancante
+    with pytest.raises(RenderingException):
+        rp._export(RenderingPipeline.get_buf())
 
 
 # -- _compose -----------------------------------------------------------------

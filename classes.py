@@ -31,6 +31,10 @@ class Palette:
                     f"color {i}: must contain 3 component for RGB, found {len(color)}"
                 )
             for component in color:
+                if not isinstance(component, int) or isinstance(component, bool):
+                    raise PaletteError(
+                        f"color {i}: component must be int, got {type(component).__name__}"
+                    )
                 if not 0 <= component <= 255:
                     raise PaletteError(
                         f"color {i}: value {component} out of bounds [0, 255]"
@@ -173,7 +177,7 @@ class SceneParser:
         transparent_idx = raw["transparent_index"]
         tile_map = raw["tile_map"]
         sprites = raw["sprites"]
-        if not isinstance(transparent_idx, int):
+        if not isinstance(transparent_idx, int) or isinstance(transparent_idx, bool):
             raise SceneError(
                 f"transparent_index must be int, got {type(transparent_idx).__name__}"
             )
@@ -188,15 +192,22 @@ class SceneParser:
                 raise SceneError(
                     f"tile_map row {i} must have 20 columns, got {len(row)}"
                 )
-        if any(not 0 <= v <= 63 for row in tile_map for v in row):
-            raise SceneError("tile_map values must be in [0, 63]")
+            for j, v in enumerate(row):
+                if not isinstance(v, int) or isinstance(v, bool):
+                    raise SceneError(
+                        f"tile_map[{i}][{j}] must be int, got {type(v).__name__}"
+                    )
+                if not 0 <= v <= 63:
+                    raise SceneError(
+                        f"tile_map[{i}][{j}] value {v} out of range [0, 63]"
+                    )
         if not isinstance(sprites, list):
             raise SceneError(f"sprites must be a list, got {type(sprites).__name__}")
         for i, sprite in enumerate(sprites):
             for key in ("id", "x", "y", "flip_x", "flip_y", "rotation"):
                 if key not in sprite:
                     raise SceneError(f"sprite {i}: missing key {key!r}")
-            if not isinstance(sprite["id"], int):
+            if not isinstance(sprite["id"], int) or isinstance(sprite["id"], bool):
                 raise SceneError(
                     f"sprite {i}: id must be int, got {type(sprite['id']).__name__}"
                 )
@@ -204,11 +215,11 @@ class SceneParser:
                 raise SceneError(
                     f"sprite {i}: id must be in [0, 15], got {sprite['id']}"
                 )
-            if not isinstance(sprite["x"], int):
+            if not isinstance(sprite["x"], int) or isinstance(sprite["x"], bool):
                 raise SceneError(
                     f"sprite {i}: x must be int, got {type(sprite['x']).__name__}"
                 )
-            if not isinstance(sprite["y"], int):
+            if not isinstance(sprite["y"], int) or isinstance(sprite["y"], bool):
                 raise SceneError(
                     f"sprite {i}: y must be int, got {type(sprite['y']).__name__}"
                 )
@@ -220,7 +231,7 @@ class SceneParser:
                 raise SceneError(
                     f"sprite {i}: flip_y must be bool, got {type(sprite['flip_y']).__name__}"
                 )
-            if not isinstance(sprite["rotation"], int):
+            if not isinstance(sprite["rotation"], int) or isinstance(sprite["rotation"], bool):
                 raise SceneError(
                     f"sprite {i}: rotation must be int, got {type(sprite['rotation']).__name__}"
                 )
@@ -312,11 +323,17 @@ class Blitter:
     # Computes valid src/dst slice pairs to copy a 64x64 sprite at (x, y) into the frame buffer.
     # Input: x, y — top-left position of the sprite in the frame buffer (can be negative).
     # Output: tuple (dst, src) where each is a tuple of two slice objects (rows, cols).
+    # A sprite fully off-screen yields an empty destination; that case is returned as
+    # empty slices, since otherwise the negative width would produce inconsistent src
+    # slices (e.g. slice(0, -60) is not empty in numpy) and crash blit_sprite.
     def _clip(self, x, y):
         dst_r0 = max(0, y)
         dst_r1 = min(FRAME_H, y + 64)
         dst_c0 = max(0, x)
         dst_c1 = min(FRAME_W, x + 64)
+        if dst_r1 <= dst_r0 or dst_c1 <= dst_c0:
+            empty = (slice(0, 0), slice(0, 0))
+            return empty, empty
         src_r0 = max(0, -y)
         src_r1 = src_r0 + (dst_r1 - dst_r0)
         src_c0 = max(0, -x)
@@ -390,7 +407,12 @@ class RenderingPipeline:
     def _export(self, buf):
         palette = Palette(self._palette_path)
         img = Image.fromarray(palette.data[buf])
-        img.save(self._output_path)
+        try:
+            img.save(self._output_path)
+        except (OSError, ValueError) as e:
+            raise RenderingException(
+                f"cannot save output PNG to {self._output_path!r}: {e}"
+            ) from e
 
     # Creates and returns a blank frame buffer.
     # Input: none.

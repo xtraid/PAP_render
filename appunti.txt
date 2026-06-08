@@ -174,6 +174,20 @@
       |- value is in demonstrating ctypes cross-language integration, not raw speed
 
 
+# TODO IF TIME (refactoring design/architettura, non bloccanti — progetto ok cosi):
+- [ ] blit_sprite: togliere il chained indexing self._buffer[dst][mask[src]] = ...
+      |- funziona solo perche dst sono slice pure (basic indexing => view => write-through)
+      |- fix idiomatico: np.copyto(region, sprite_buf[src], where=sprite_buf[src] != transparent_index)
+         con region = self._buffer[dst]
+- [ ] RenderingPipeline: caricare Palette/VirtualVRAM/SceneParser in cima a render() (fail-fast)
+      |- ora la palette si valida solo in _export, dopo aver gia composto tutto il buffer
+      |- passare gli oggetti gia pronti a _compose/_export invece di ricostruirli
+- [ ] Blitter: spostare l'id da costruttore a parametro dei metodi (un solo Blitter per scena)
+      |- ora se ne crea 1 per cella (300+) e si ri-valida transparent_index ogni volta
+      |- blit_tile(tile_id, row, col) / blit_sprite(sprite_id, x, y, flip_x, flip_y, rotation)
+      |- N.B. cambia le firme => aggiornare i test (make_pipeline, test Blitter)
+
+
 # REQUIREMENTS:
 - in case of error the renderer must raise a related exception, is suggested to make custom exceptions
 - each relevant function must be commented with what it does, its input and its output

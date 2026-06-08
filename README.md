@@ -174,7 +174,7 @@ Raises `RenderingException` on pipeline errors.
 .
 ├── main.py               # CLI entry point
 ├── classes.py            # Palette, VirtualVRAM, SceneParser, Blitter, RenderingPipeline
-├── tests.py              # Test suite (133 tests, all passing)
+├── tests.py              # Test suite (135 tests, all passing)
 ├── input/                # Example input files (palette, scene, tiles, sprites)
 ├── output/               # Rendered PNG output goes here
 ├── test_data/
@@ -193,7 +193,7 @@ Raises `RenderingException` on pipeline errors.
 uv run pytest tests.py -v
 ```
 
-133 tests covering all classes:
+135 tests covering all classes:
 
 **Palette (16 tests)**
 - Happy path: load, `__getitem__` first/last, boundary values (0 and 255)
@@ -218,12 +218,12 @@ uv run pytest tests.py -v
 - Isolation: sprite 7 filled, sprite 0 untouched
 - Errors: non-int id, id 16, id −1
 
-**SceneParser (28 tests)**
+**SceneParser (29 tests)**
 - Happy path: load, transparent_index, tile_map shape and dtype, sprites list, boundary transparent_index 15, empty sprites, sprite fields
 - File errors: file not found, invalid JSON
 - Missing keys: transparent_index, tile_map, sprites
 - transparent_index errors: not int, too high (16), negative
-- tile_map errors: wrong rows, wrong cols, jagged rows, value 64, negative value
+- tile_map errors: wrong rows, wrong cols, jagged rows, value 64, negative value, value not int
 - sprites errors: not a list, missing field, id not int, id out of range, x/y not int, flip_x/flip_y not bool, rotation not int, rotation invalid (45)
 
 **Blitter (46 tests)**
@@ -233,10 +233,10 @@ uv run pytest tests.py -v
 - _clip: fully inside, centered, clipping on all 4 sides, sprite fully outside frame
 - blit_sprite: all-opaque, all-transparent, mixed transparency, position, clipping on all 4 sides, fully outside frame on all 4 sides, transform+clip combined, z-order
 
-**RenderingPipeline (17 tests)**
+**RenderingPipeline (18 tests)**
 - get_buf: shape, dtype, all zeros, independence between calls
 - __repr__: all 5 paths present
-- _export: file created, image size 640×480, pixel color maps correctly from palette
+- _export: file created, image size 640×480, pixel color maps correctly from palette, bad output path raises RenderingException
 - _compose: tiles written, full tile_map filled, sprite over tile, transparent sprite not drawn, sprite z-order, sprite transformation applied, sprite clipping at frame edge
 - render(): output file created, output size 640×480
 
